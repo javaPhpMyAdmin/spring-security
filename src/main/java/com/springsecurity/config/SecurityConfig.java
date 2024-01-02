@@ -2,47 +2,51 @@ package com.springsecurity.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.springsecurity.repositories.AuthRepository;
+import com.springsecurity.entities.Permission;
+import com.springsecurity.filters.JwtFilter;
 
 import lombok.RequiredArgsConstructor;
 
 @Configuration
+@EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final AuthRepository authRepository;
+  private final AuthenticationProvider authenticationProvider;
+  private final JwtFilter jwtFilter;
 
-    @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+  @Bean
+  SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+    return httpSecurity
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(authRequest -> authRequest
+            .requestMatchers("/api/v1/auth/**").permitAll()
+            // .requestMatchers("/api/v1/income/**").hasAnyRole(Role.ADMIN.name(),
+            // Role.MANAGER.name())
+            .requestMatchers(HttpMethod.GET,
+                "/api/v1/income/**")
+            .hasAuthority(Permission.ADMIN_READ.name())
+            .requestMatchers(HttpMethod.POST,
+                "/api/v1/income/**")
+            .hasAuthority(Permission.ADMIN_CREATE.name())
+            .requestMatchers(HttpMethod.PUT,
+                "/api/v1/income/**")
+            .hasAuthority(Permission.ADMIN_UPDATE.name())
+            .anyRequest().authenticated())
+        .sessionManagement(
+            sessionManager -> sessionManager
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authenticationProvider(authenticationProvider)
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+        .build();
+  }
 
-    }
-
-    @Bean
-    AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userDetailsService());
-        authenticationProvider.setPasswordEncoder(passwordEncoder());
-        return authenticationProvider;
-    }
-
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    UserDetailsService userDetailsService() {
-        return email -> authRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-    }
 }

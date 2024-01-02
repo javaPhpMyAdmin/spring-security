@@ -8,5 +8,5 @@ import com.springsecurity.entities.UserEntity;
 
 public interface AuthRepository extends JpaRepository<UserEntity, Long> {
 
-    Optional<UserEntity> findByEmail(String email);
+  Optional<UserEntity> findByEmail(String email);
 }
